@@ -1,0 +1,93 @@
+ÉPICA 1: Gestión de Citas Médicas
+
+ID 	ROL	CARACTERÍSTICA	RAZÓN	CRITERIOS DE ACEPTACIÓN
+HU01	Como Oficinista	Necesito registrar una cita con pocos clics	Para ahorrar tiempo en la atención	• Registro en pocos pasos
+• Confirmación visual al guardar.
+HU02	Como Oficinista	Necesito ver la disponibilidad de un doctor en un calendario	Para evitar dobles reservas	• El calendario muestra disponibilidad en colores.
+• No permite agendar en horarios ocupados.
+HU03	Como Oficinista	Necesito reprogramar citas arrastrando en el calendario	Para hacer cambios fácilmente	• Se permite drag & drop o sistema típico.
+• El sistema actualiza automáticamente la nueva hora.
+HU04	Como Oficinista	Necesito confirmar una cita con un ícono de color	Para identificar fácilmente su estado	• Estado confirmado en verde, pendiente en amarillo, cancelado en rojo.
+HU05	Como Oficinista	Necesito anular una cita con pocos clics	Para liberar horarios rápidamente	• Botón cancelar visible.
+• El horario queda libre automáticamente.
+•Alerta de confirmación de anulación de cita.
+HU06	Como Oficinista	Necesito ver todas las citas del día en lista simple	Para organizar la atención diaria	• Vista tipo lista con hora, paciente y doctor.
+HU07	Como Doctor	Necesito recibir un resumen diario de mis citas	Para organizar mejor mi jornada	• El resumen aparece al iniciar sesión.
+• Incluye fecha, hora y paciente.
+HU08	Como Administrador	Necesito filtrar citas por doctor y fecha	Para obtener una visión clara de la agenda	• Filtros desplegables en panel.
+• Resultados en lista simple.
+HU09	Como Administrador	Necesito generar un listado de todas las citas del día	Para entregar al personal de apoyo	• Listado exportable a PDF o Excel.
+HU10	Como Doctor	Necesito acceder a mis citas desde el celular	Para revisar mi agenda sin depender del PC	• Interfaz responsive.
+• Muestra citas en lista simple.
+
+ÉPICA 2: Gestión de Pacientes
+ID 	ROL	CARACTERÍSTICA	RAZÓN	CRITERIOS DE ACEPTACIÓN
+HU11	Como Oficinista	Necesito registrar un paciente con datos básicos	Para agilizar la atención.	Campos mínimos: nombre, RUT, teléfono, dirección y motivo de la visita.
+            
+HU12	Como Oficinista	Necesito buscar un paciente rápidamente	Para encontrarlo sin complicaciones.	Barra de búsqueda por RUT.
+HU13	Como Administrador	Necesito exportar la lista de pacientes	Para tener respaldo de la información	Botón “Exportar a Excel”.
+HU14	Como Doctor	Necesito ver un historial simple de consultas del paciente	Para atender con contexto	Se muestran las últimas 3 consultas.
+HU15	Como Doctor	Necesito añadir notas breves a la ficha del paciente	Para recordar aspectos importantes	Campo de notas editable.
+Guardado automático.
+HU16	Como Administrador	Necesito eliminar registros duplicados	Para mantener la base de datos limpia	Detección automática de duplicados.
+Confirmación antes de eliminar.
+
+HU17	Como Doctor	Necesito ver la edad calculada del paciente	Para ahorrar tiempo en la consulta	Edad calculada a partir de la fecha de nacimiento.
+HU18	Como Oficinista	Necesito registrar pacientes sin correo electrónico	Para no complicar el ingreso de datos	Campo correo no es obligatorio.
+HU19	Como Doctor	Necesito imprimir una ficha resumida del paciente	Para revisar antes de la consulta	Botón de impresión con datos básicos.
+HU20	Como Administrador	Necesito validar el RUT en el sistema	Para evitar registros erróneos	Campo RUT con validación automática.
+
+
+
+
+
+
+ÉPICA 3: Disponibilidad de Doctores
+
+ID 	ROL	CARACTERÍSTICA	RAZÓN	CRITERIOS DE ACEPTACIÓN
+HU21	Como Doctor	Necesito bloquear los días que no atenderé	Para que no se agenden citas en esas fechas	• Selección de días no disponibles en calendario.
+HU22	Como Doctor	Necesito definir mis horarios de atención	Para organizar mi agenda de forma clara	• Configuración de horas disponibles por día.
+HU23	Como Doctor	Necesito editar mi disponibilidad rápidamente	Para reflejar cambios de último minuto	• Opción de edición con guardado en tiempo real.
+HU24	Como Oficinista	Necesito ver en qué horarios el doctor está libre	Para evitar errores al agendar	• Horarios disponibles resaltados en verde.
+HU25	Como Doctor	Necesito registrar vacaciones en el sistema	Para no recibir citas en ese periodo	• Días marcados como “no disponible”.
+HU26	Como Administrador	Necesito verificar la disponibilidad de todos los doctores	Para asignar citas de forma justa	• Vista consolidada con todos los doctores y horarios.
+HU27	Como Doctor	Necesito habilitar horas extras en caso de alta demanda	Para apoyar la clínica cuando sea necesario	• Botón “Agregar horas adicionales”
+HU28	Como Oficinista	Necesito visualizar de inmediato cuando un doctor cambia su disponibilidad	Para evitar citas mal asignadas	• Notificación en tiempo real en el sistema.
+HU29	Como Administrador	Necesito revisar el historial de cambios en disponibilidad	Para auditar modificaciones	• Registro de cambios con fecha y usuario
+
+
+
+
+
+
+
+
+ÉPICA 4: Dashboard Administrativo
+ID	Rol	Característica / Funcionalidad	Razón / Resultado	Criterios de aceptación
+HU30	Como Administrador	Necesito ver la cantidad de pacientes atendidos en el día	Para evaluar el rendimiento de la clínica	• Gráfico simple en el dashboard.
+HU31	Como Administrador	Necesito ver el número de citas canceladas	Para identificar posibles problemas	• Indicador numérico actualizado en tiempo real.
+HU32	Como Administrador	Necesito ver cuántos doctores están activos en la jornada	Para controlar la operación	• Lista de doctores con estado activo/inactivo.
+HU33	Como Administrador	Necesito generar un reporte mensual de atenciones	Para analizar el desempeño	• Reporte descargable en PDF y Excel.
+HU34	Como Administrador	Necesito ver las especialidades más solicitadas	Para planificar recursos médicos	• Gráfico de barras con frecuencia o variantes por especialidad.
+HU35	Como Administrador	Necesito filtrar métricas por rango de fechas	Para comparar periodos distintos	• Selector de fechas con actualización automática.
+HU36	Como Administrador	Necesito un resumen de ingresos generados	Para evaluar el aspecto económico	• Cifra total mostrada en la tarjeta del dashboard.
+HU37	Como Administrador	Necesito ver un top de doctores más demandados	Para planificar distribución de pacientes	• Tabla con ranking de doctores.
+HU38	Como Administrador	Necesito visualizar indicadores en gráficos minimalistas	Para interpretar datos rápidamente	• Uso de gráficos circulares y de barras simples.
+HU39	Como Administrador	Necesito exportar todos los reportes con un clic	Para ahorrar tiempo en la gestión	• Botón único de exportación en el dashboard.
+
+
+
+
+ÉPICA 5: Sistema de Notificaciones
+ID	Rol	Característica / Funcionalidad	Razón / Resultado	Criterios de aceptación
+HU40	Como Oficinista	Necesito que el doctor reciba notificación al crear una cita	Para confirmar disponibilidad	• Notificación enviada a Gmail o WhatsApp.
+HU41	Como Doctor	Necesito recibir un aviso cuando se cancela una cita	Para reorganizar mi tiempo	• Mensaje de cancelación con hora y paciente.
+HU42	Como Doctor	Necesito que las notificaciones sean cortas y claras	Para entender rápido el mensaje	• Texto máximo 2 líneas, con fecha y hora.
+HU43	Como Administrador	Necesito recibir alertas cuando un doctor cambia disponibilidad	Para estar informado de modificaciones	• Notificación en el panel administrativo.
+HU44	Como Oficinista	Necesito que el sistema confirme automáticamente la cita al paciente	Para evitar malentendidos	• Mensaje enviado con fecha, hora y doctor asignado.
+HU45	Como Doctor	Necesito recibir recordatorios de mis citas del día	Para no olvidar ninguna atención	• Notificación cada mañana con la agenda.
+HU46	Como Administrador	Necesito ver un historial de notificaciones enviadas	Para tener trazabilidad	• Registro con fecha, hora y destinatario.
+HU47	Como Oficinista	Necesito que la confirmación de cita indique el estado del doctor	Para evitar dudas del paciente	• El mensaje incluye “confirmada” o “pendiente de confirmación”.
+HU48	Como Doctor	Necesito que las notificaciones tengan enlaces rápidos al sistema	Para acceder directamente a la cita	• Link directo en el mensaje.
+HU49	Como Oficinista	Necesito que las notificaciones se envíen automáticamente sin intervención manual	Para ahorrar tiempo en mi trabajo	• Notificaciones programadas por el sistema.
+
