@@ -35,9 +35,11 @@ npm install
 Crear un archivo `.env.local` en la raíz del proyecto:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://zdrwmgmuehektdwbldfe.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkcndtZ211ZWhla3Rkd2JsZGZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NTExNTUsImV4cCI6MjA3NjAyNzE1NX0.OpJVNSaVZV4i2sy92PLtF7-VWmG3hWEOlFXaFcpSAOU
+NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
 ```
+
+**⚠️ Importante:** Las keys de Supabase son sensibles. Obtén tus propias keys desde tu proyecto en [Supabase](https://supabase.com).
 
 ### 3. Configurar Base de Datos
 
