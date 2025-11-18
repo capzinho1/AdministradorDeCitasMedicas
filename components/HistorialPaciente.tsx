@@ -5,14 +5,12 @@ import { supabase, ConsultationHistory } from '@/lib/supabase'
 
 interface PatientHistoryProps {
   patientId?: string
-  doctorId?: string // Si se proporciona, filtra por este doctor
-  showDoctorFilter?: boolean // Si es true, muestra el filtro para elegir ver solo del doctor actual
+  doctorId?: string
 }
 
-export default function HistorialPaciente({ patientId, doctorId, showDoctorFilter = false }: PatientHistoryProps) {
+export default function HistorialPaciente({ patientId, doctorId }: PatientHistoryProps) {
   const [history, setHistory] = useState<ConsultationHistory[]>([])
   const [loading, setLoading] = useState(false)
-  const [filterByDoctor, setFilterByDoctor] = useState(false)
 
   useEffect(() => {
     if (patientId) {
@@ -20,14 +18,14 @@ export default function HistorialPaciente({ patientId, doctorId, showDoctorFilte
     } else {
       setHistory([])
     }
-  }, [patientId, filterByDoctor])
+  }, [patientId])
 
   const fetchPatientHistory = async () => {
     if (!patientId) return
 
     setLoading(true)
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('consultation_history')
         .select(`
           *,
@@ -35,13 +33,6 @@ export default function HistorialPaciente({ patientId, doctorId, showDoctorFilte
           doctor:doctors(name, specialty)
         `)
         .eq('patient_id', patientId)
-
-      // Si se activa el filtro y hay doctorId, filtrar por ese doctor
-      if (filterByDoctor && doctorId) {
-        query = query.eq('doctor_id', doctorId)
-      }
-
-      const { data, error } = await query
         .order('consultation_date', { ascending: false })
         .order('consultation_time', { ascending: false })
 
@@ -80,29 +71,12 @@ export default function HistorialPaciente({ patientId, doctorId, showDoctorFilte
 
   return (
     <div>
-      {showDoctorFilter && doctorId && (
-        <div className="mb-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filterByDoctor}
-              onChange={(e) => setFilterByDoctor(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <span>Solo mis consultas</span>
-          </label>
-        </div>
-      )}
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {loading ? (
           <div className="text-center py-6">
             <p className="text-gray-500 text-sm">Cargando...</p>
           </div>
-        ) : history.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-500 text-sm">Sin consultas registradas</p>
-          </div>
-        ) : (
+        ) : history.length === 0 ? null : (
           history.map((consultation) => (
             <div key={consultation.id} className="bg-gray-50 p-3 rounded border">
               <div className="flex justify-between">

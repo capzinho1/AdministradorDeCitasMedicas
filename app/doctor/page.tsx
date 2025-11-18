@@ -133,7 +133,6 @@ export default function DoctorPage() {
           <HistorialPaciente 
             patientId={selectedPatient?.id} 
             doctorId={doctorId || undefined}
-            showDoctorFilter={true}
           />
         </div>
 

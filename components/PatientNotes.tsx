@@ -13,7 +13,6 @@ export default function PatientNotes({ patientId, doctorId }: PatientNotesProps)
   const [notes, setNotes] = useState<PatientNote[]>([])
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,19 +35,6 @@ export default function PatientNotes({ patientId, doctorId }: PatientNotesProps)
 
   const handleNoteChange = (value: string) => {
     setNewNote(value)
-
-    // Cancelar el timeout anterior
-    if (saveTimeout) {
-      clearTimeout(saveTimeout)
-    }
-
-    // Si hay texto, configurar guardado automático en 2 segundos
-    if (value.trim()) {
-      const timeout = setTimeout(() => {
-        saveNote(value)
-      }, 2000)
-      setSaveTimeout(timeout)
-    }
   }
 
   const saveNote = async (noteText: string) => {
@@ -105,7 +91,7 @@ export default function PatientNotes({ patientId, doctorId }: PatientNotesProps)
           <textarea
             value={newNote}
             onChange={(e) => handleNoteChange(e.target.value)}
-            placeholder="Escribir nota breve... (Se guarda automáticamente)"
+            placeholder="Escribir nota clínica..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
             rows={3}
           />
@@ -115,18 +101,15 @@ export default function PatientNotes({ patientId, doctorId }: PatientNotesProps)
             </div>
           )}
         </div>
-        <div className="flex justify-between items-center mt-2">
-          <p className="text-xs text-gray-500">
-            {newNote.trim() ? 'Se guardará automáticamente en 2 segundos...' : 'Las notas se guardan automáticamente'}
-          </p>
+        <div className="flex justify-end items-center mt-2">
           {newNote.trim() && (
             <button
               onClick={() => saveNote(newNote)}
               disabled={saving}
-              className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              <Plus className="w-3 h-3" />
-              Guardar Ahora
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando...' : 'Guardar Nota'}
             </button>
           )}
         </div>
