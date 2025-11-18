@@ -40,7 +40,7 @@ export default function CitasConDragDrop() {
   const [tieneConfiguracion, setTieneConfiguracion] = useState<boolean | null>(null) // null = no verificado, true/false = verificado
 
   // Usar el hook de tiempo real para obtener citas
-  const { appointments, loading } = useRealtimeAppointments({
+  const { appointments, loading, refetch } = useRealtimeAppointments({
     date: fecha,
     doctorId: doctorSeleccionado,
     enabled: !!doctorSeleccionado && !!fecha
@@ -206,12 +206,9 @@ export default function CitasConDragDrop() {
       .eq('id', citaId)
     
     if (!error) {
-      // Actualizar inmediatamente sin recargar
-      setCitas(prevCitas => 
-        prevCitas.map(c => 
-          c.id === citaId ? { ...c, status: nuevoEstado } : c
-        )
-      )
+      // El hook de tiempo real actualizará automáticamente
+      // Pero forzamos una actualización inmediata para mejor UX
+      refetch()
     }
   }
 
@@ -241,12 +238,9 @@ export default function CitasConDragDrop() {
       .eq('id', citaId)
     
     if (!error) {
-      // Actualizar inmediatamente sin recargar
-      setCitas(prevCitas => 
-        prevCitas.map(c => 
-          c.id === citaId ? { ...c, appointment_time: horarioCompleto } : c
-        ).sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-      )
+      // El hook de tiempo real actualizará automáticamente
+      // Pero forzamos una actualización inmediata para mejor UX
+      refetch()
     }
   }
 
