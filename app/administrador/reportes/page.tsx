@@ -155,7 +155,8 @@ export default function ReportesAdminPage() {
     citasPorHora.sort((a, b) => a.hora.localeCompare(b.hora))
 
     // Calcular KPIs
-    const promedioCitasPorDoctor = doctores?.length > 0 ? (totalCitas / doctores.length) : 0
+    const totalDoctores = doctores?.length || 0
+    const promedioCitasPorDoctor = totalDoctores > 0 ? (totalCitas / totalDoctores) : 0
     const citasProgramadas = completadas + confirmadas + pendientes
     const tasaOcupacion = totalCitas > 0 ? ((citasProgramadas / totalCitas) * 100) : 0
 
