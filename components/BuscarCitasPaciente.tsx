@@ -64,7 +64,7 @@ export default function BuscarCitasPaciente() {
 
   const cancelarCita = async (citaId: string) => {
     const confirmacion = window.confirm(
-      '⚠️ ¿Está seguro de que desea cancelar esta cita?\n\n' +
+      '¿Está seguro de que desea cancelar esta cita?\n\n' +
       'El horario quedará automáticamente libre para otros pacientes.'
     )
 
@@ -76,7 +76,7 @@ export default function BuscarCitasPaciente() {
       .eq('id', citaId)
 
     // Mostrar alerta de confirmación
-    alert('✅ Cita cancelada exitosamente.\nEl horario está ahora disponible.')
+    alert('Cita cancelada exitosamente.\nEl horario está ahora disponible.')
 
     // Recargar citas
     buscarCitas({ preventDefault: () => {} } as React.FormEvent)

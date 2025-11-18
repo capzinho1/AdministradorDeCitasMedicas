@@ -40,6 +40,10 @@ export default function DisponibilidadDoctor({ doctorId }: DisponibilidadDoctorP
     const mapa = new Map<string, boolean>()
     if (data) {
       data.forEach((item: DoctorAvailability) => {
+        // Ignorar el registro especial (day_of_week = 0) que indica "configurado pero vacío"
+        if (item.day_of_week === 0 && item.is_available === false) {
+          return
+        }
         const key = `${item.day_of_week}-${item.time_slot}`
         mapa.set(key, item.is_available)
       })
@@ -87,20 +91,37 @@ export default function DisponibilidadDoctor({ doctorId }: DisponibilidadDoctorP
       }
     }
 
-    if (registros.length > 0) {
-      const { error } = await supabase
-        .from('doctor_availability')
-        .insert(registros)
-
-      if (error) {
-        alert('Error al guardar la disponibilidad')
-        console.error(error)
-      } else {
-        alert('Disponibilidad guardada correctamente')
-      }
+    // Si no hay registros (disponibilidad vacía), insertar un registro especial
+    // que indique que el doctor configuró su disponibilidad pero no tiene horarios
+    if (registros.length === 0) {
+      // Insertar un registro con day_of_week = 0 (no usado) para indicar "configurado pero vacío"
+      registros.push({
+        doctor_id: doctorId,
+        day_of_week: 0, // 0 no se usa normalmente, lo usamos como marcador
+        time_slot: '00:00:00',
+        is_available: false // false indica que está configurado pero vacío
+      })
     }
 
-    setGuardando(false)
+    const { error } = await supabase
+      .from('doctor_availability')
+      .insert(registros)
+
+    if (error) {
+      alert('Error al guardar la disponibilidad')
+      console.error(error)
+      setGuardando(false)
+    } else {
+      alert('Disponibilidad guardada correctamente. La página se recargará en 1 segundo...')
+      // Recargar la disponibilidad para mostrar los cambios
+      await cargarDisponibilidad()
+      setGuardando(false)
+      
+      // Recargar la página después de un breve delay para que otros usuarios vean los cambios
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    }
   }
 
   const seleccionarTodoElDia = (dia: number) => {
@@ -186,7 +207,7 @@ export default function DisponibilidadDoctor({ doctorId }: DisponibilidadDoctorP
                             : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
                         }`}
                       >
-                        {disponible ? '✓' : '-'}
+                        {disponible ? 'Sí' : 'No'}
                       </button>
                     </td>
                   )

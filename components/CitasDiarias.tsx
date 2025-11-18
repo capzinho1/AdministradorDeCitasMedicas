@@ -2,54 +2,38 @@
 
 import { useState, useEffect } from 'react'
 import { supabase, Appointment } from '@/lib/supabase'
+import { useRealtimeAppointments } from '@/lib/hooks/useRealtimeAppointments'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import DateSelector from './DateSelector'
+import Pagination from './shared/Pagination'
 
 interface CitasDiariasProps {
   doctorId?: string // Si se proporciona, filtra por este doctor
 }
 
 export default function CitasDiarias({ doctorId }: CitasDiariasProps = {}) {
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loading, setLoading] = useState(false)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(16)
 
+  // Usar el hook de tiempo real para obtener citas
+  const { appointments, loading } = useRealtimeAppointments({
+    date: selectedDate,
+    doctorId: doctorId,
+    enabled: !!selectedDate
+  })
+
+  // Paginación
+  const totalPages = Math.ceil(appointments.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedAppointments = appointments.slice(startIndex, endIndex)
+
+  // Resetear a página 1 cuando cambia la fecha
   useEffect(() => {
-    fetchDailyAppointments()
-  }, [selectedDate, doctorId])
-
-  const fetchDailyAppointments = async () => {
-    setLoading(true)
-    try {
-      let query = supabase
-        .from('appointments')
-        .select(`
-          *,
-          patient:patients(first_name, last_name, rut),
-          doctor:doctors(name, specialty)
-        `)
-        .eq('appointment_date', selectedDate)
-
-      // Si hay doctorId, filtrar solo las citas de ese doctor
-      if (doctorId) {
-        query = query.eq('doctor_id', doctorId)
-      }
-
-      const { data, error } = await query.order('appointment_time', { ascending: true })
-
-      if (error) {
-        console.error('Error fetching appointments:', error)
-        return
-      }
-
-      setAppointments(data || [])
-    } catch (error) {
-      console.error('Error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    setCurrentPage(1)
+  }, [selectedDate])
 
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string) => {
     try {
@@ -63,7 +47,7 @@ export default function CitasDiarias({ doctorId }: CitasDiariasProps = {}) {
         return
       }
 
-      fetchDailyAppointments()
+      // No necesitamos recargar manualmente, el hook de tiempo real lo hará automáticamente
     } catch (error) {
       console.error('Error:', error)
     }
@@ -120,7 +104,7 @@ export default function CitasDiarias({ doctorId }: CitasDiariasProps = {}) {
           </span>
         </div>
         
-        <div className="space-y-2 max-h-[500px] overflow-y-auto">
+        <div className="space-y-2">
           {loading ? (
             <div className="text-center py-6">
               <p className="text-gray-600 text-sm">Cargando...</p>
@@ -130,7 +114,7 @@ export default function CitasDiarias({ doctorId }: CitasDiariasProps = {}) {
               <p className="text-gray-500 text-sm">No hay citas para esta fecha</p>
             </div>
           ) : (
-            appointments.map((appointment, index) => (
+            paginatedAppointments.map((appointment, index) => (
               <div 
                 key={appointment.id} 
                 className="bg-white border border-gray-300 rounded p-3"
@@ -181,13 +165,16 @@ export default function CitasDiarias({ doctorId }: CitasDiariasProps = {}) {
         </div>
       </div>
       
-      {appointments.length > 0 && (
-        <div className="mt-3 pt-2 border-t text-xs text-gray-600 flex gap-3">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
+      {/* Paginación */}
+      {!loading && appointments.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          totalItems={appointments.length}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       )}
     </div>
   )

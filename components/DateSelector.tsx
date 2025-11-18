@@ -7,6 +7,7 @@ interface DateSelectorProps {
   className?: string
   maxDate?: string // Formato: YYYY-MM-DD
   minDate?: string // Formato: YYYY-MM-DD
+  disabled?: boolean
 }
 
 export default function DateSelector({ 
@@ -15,7 +16,8 @@ export default function DateSelector({
   label, 
   className = '',
   maxDate,
-  minDate
+  minDate,
+  disabled = false
 }: DateSelectorProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value)
@@ -30,7 +32,10 @@ export default function DateSelector({
         onChange={handleChange}
         min={minDate}
         max={maxDate}
-        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-white text-sm"
+        disabled={disabled}
+        className={`w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500 text-sm ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+        }`}
       />
     </div>
   )

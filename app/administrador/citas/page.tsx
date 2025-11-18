@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Appointment } from '@/lib/supabase'
+import { useRealtimeAppointments } from '@/lib/hooks/useRealtimeAppointments'
 import DateSelector from '@/components/DateSelector'
+import Pagination from '@/components/shared/Pagination'
 
 interface AppointmentWithDetails {
   id: string
@@ -19,57 +20,43 @@ interface AppointmentWithDetails {
 }
 
 export default function CitasAdminPage() {
-  const [citas, setCitas] = useState<AppointmentWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
   const [fecha, setFecha] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('all')
   const [filtroDoctor, setFiltroDoctor] = useState('all')
   const [doctores, setDoctores] = useState<any[]>([])
+  const [mostrarTodas, setMostrarTodas] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(16)
 
   useEffect(() => {
-    const hoy = new Date().toISOString().split('T')[0]
-    setFecha(hoy)
     cargarDoctores()
   }, [])
 
+  // Usar el hook de tiempo real para obtener citas
+  const { appointments, loading } = useRealtimeAppointments({
+    date: mostrarTodas ? undefined : fecha,
+    doctorId: filtroDoctor !== 'all' ? filtroDoctor : undefined,
+    status: filtroEstado !== 'all' ? filtroEstado : undefined,
+    enabled: mostrarTodas || !!fecha
+  })
+
+  // Convertir appointments a AppointmentWithDetails
+  const todasLasCitas = appointments as AppointmentWithDetails[]
+
+  // Paginación
+  const totalPages = Math.ceil(todasLasCitas.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const citas = todasLasCitas.slice(startIndex, endIndex)
+
+  // Resetear a página 1 cuando cambian los filtros
   useEffect(() => {
-    if (fecha) {
-      cargarCitas(fecha)
-    }
-  }, [fecha, filtroEstado, filtroDoctor])
+    setCurrentPage(1)
+  }, [fecha, filtroDoctor, filtroEstado, mostrarTodas])
 
   const cargarDoctores = async () => {
     const { data } = await supabase.from('doctors').select('id, name')
     if (data) setDoctores(data)
-  }
-
-  const cargarCitas = async (fechaBuscar: string) => {
-    setLoading(true)
-
-    let query = supabase
-      .from('appointments')
-      .select(`
-        *,
-        patient:patients(first_name, last_name, rut),
-        doctor:doctors(name, specialty, id)
-      `)
-      .eq('appointment_date', fechaBuscar)
-
-    if (filtroEstado !== 'all') {
-      query = query.eq('status', filtroEstado)
-    }
-
-    if (filtroDoctor !== 'all') {
-      query = query.eq('doctor_id', filtroDoctor)
-    }
-
-    const { data } = await query.order('appointment_time')
-
-    if (data) {
-      setCitas(data as AppointmentWithDetails[])
-    }
-
-    setLoading(false)
   }
 
   const cambiarEstado = async (citaId: string, nuevoEstado: string) => {
@@ -78,7 +65,7 @@ export default function CitasAdminPage() {
       .update({ status: nuevoEstado })
       .eq('id', citaId)
 
-    cargarCitas(fecha)
+    // No necesitamos recargar manualmente, el hook de tiempo real lo hará automáticamente
   }
 
   const getEstadoColor = (status: string) => {
@@ -101,14 +88,6 @@ export default function CitasAdminPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <p className="text-gray-600">Cargando citas...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -119,12 +98,38 @@ export default function CitasAdminPage() {
       {/* Filtros */}
       <div className="bg-white border border-gray-200 rounded p-4 mb-6">
         <h3 className="font-bold mb-3">Filtros</h3>
+        
+        {/* Opción para mostrar todas las citas */}
+        <div className="mb-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={mostrarTodas}
+              onChange={(e) => {
+                setMostrarTodas(e.target.checked)
+                if (e.target.checked) {
+                  setFecha('')
+                }
+              }}
+              className="w-4 h-4"
+            />
+            <span className="text-sm font-medium">Mostrar todas las citas (sin filtrar por fecha)</span>
+          </label>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <DateSelector
-            value={fecha}
-            onChange={setFecha}
-            label="Fecha"
-          />
+          <div>
+            <label className="block text-sm mb-1">Fecha {mostrarTodas ? '(deshabilitado)' : '*'}</label>
+            <DateSelector
+              value={fecha}
+              onChange={setFecha}
+              label=""
+              disabled={mostrarTodas}
+            />
+            {!mostrarTodas && !fecha && (
+              <p className="text-xs text-red-600 mt-1">Seleccione una fecha o active "Mostrar todas"</p>
+            )}
+          </div>
           <div>
             <label className="block text-sm mb-1">Doctor</label>
             <select
@@ -132,7 +137,7 @@ export default function CitasAdminPage() {
               onChange={(e) => setFiltroDoctor(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 bg-white"
             >
-              <option value="all">Todos</option>
+              <option value="all">Todos los doctores</option>
               {doctores.map(doc => (
                 <option key={doc.id} value={doc.id}>{doc.name}</option>
               ))}
@@ -145,97 +150,87 @@ export default function CitasAdminPage() {
               onChange={(e) => setFiltroEstado(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 bg-white"
             >
-              <option value="all">Todos</option>
-              <option value="pending">Pendiente</option>
+              <option value="all">Todos los estados</option>
               <option value="confirmed">Confirmada</option>
               <option value="completed">Completada</option>
               <option value="cancelled">Cancelada</option>
             </select>
           </div>
         </div>
-        <div className="mt-3 text-gray-600">
-          Total: <strong>{citas.length}</strong> citas
-        </div>
       </div>
 
-      {/* Leyenda de estados */}
-      <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-6">
-        <div className="flex gap-4 text-sm">
-          <span className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-yellow-500 rounded"></span>
-            Pendiente
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-blue-500 rounded"></span>
-            Confirmada
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-green-500 rounded"></span>
-            Completada
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-red-500 rounded"></span>
-            Cancelada
-          </span>
-        </div>
-      </div>
 
       {/* Lista de citas */}
-      {citas.length === 0 ? (
+      {loading ? (
         <div className="bg-white border border-gray-200 rounded p-8 text-center">
-          <p className="text-gray-600">No hay citas para esta fecha</p>
+          <p className="text-gray-600">Cargando citas...</p>
+        </div>
+      ) : citas.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded p-8 text-center">
+          <p className="text-gray-600">
+            {mostrarTodas 
+              ? 'No hay citas que coincidan con los filtros seleccionados'
+              : !fecha 
+              ? 'Seleccione una fecha o active "Mostrar todas las citas"'
+              : 'No hay citas para los filtros seleccionados'}
+          </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {citas.map((cita) => (
             <div
               key={cita.id}
-              className="bg-white border border-gray-200 rounded p-4"
+              className="bg-white border border-gray-200 rounded p-2"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-lg font-bold text-gray-800">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base font-bold text-gray-800">
                       {cita.appointment_time}
                     </span>
-                    <span className={`px-3 py-1 rounded text-sm border ${getEstadoColor(cita.status)}`}>
+                    <span className="text-xs text-gray-500">
+                      {new Date(cita.appointment_date).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: 'short'
+                      })}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-xs border ${getEstadoColor(cita.status)}`}>
                       {getEstadoTexto(cita.status)}
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <p className="text-sm text-gray-600">Paciente</p>
-                      <p className="font-medium text-gray-800">
+                      <p className="text-gray-500 mb-0.5">Paciente</p>
+                      <p className="font-medium text-gray-800 truncate">
                         {cita.patient?.first_name} {cita.patient?.last_name}
                       </p>
-                      <p className="text-sm text-gray-500">{cita.patient?.rut}</p>
+                      <p className="text-gray-500">{cita.patient?.rut}</p>
                     </div>
                     
                     <div>
-                      <p className="text-sm text-gray-600">Doctor</p>
-                      <p className="font-medium text-gray-800">{cita.doctor?.name}</p>
-                      <p className="text-sm text-gray-500">{cita.doctor?.specialty}</p>
+                      <p className="text-gray-500 mb-0.5">Doctor</p>
+                      <p className="font-medium text-gray-800 truncate">{cita.doctor?.name}</p>
+                      <p className="text-gray-500 truncate">{cita.doctor?.specialty}</p>
                     </div>
                   </div>
 
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-600">Tipo: <span className="font-medium">{cita.consultation_type}</span></p>
+                  <div className="mt-1 text-xs">
+                    <span className="text-gray-600">Tipo: <span className="font-medium">{cita.consultation_type}</span></span>
                     {cita.reason && (
-                      <p className="text-sm text-gray-600">Motivo: <span className="font-medium">{cita.reason}</span></p>
+                      <span className="text-gray-500 ml-2">• <span className="italic">{cita.reason}</span></span>
                     )}
                   </div>
                 </div>
 
                 {/* Menú desplegable de estado */}
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Cambiar Estado</label>
+                <div className="flex-shrink-0">
+                  <label className="block text-xs text-gray-600 mb-0.5">Estado</label>
                   <select
                     value={cita.status}
                     onChange={(e) => cambiarEstado(cita.id, e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                    className="border border-gray-300 rounded px-2 py-1 text-xs bg-white"
                   >
-                    <option value="pending">Pendiente</option>
                     <option value="confirmed">Confirmada</option>
                     <option value="completed">Completada</option>
                     <option value="cancelled">Cancelada</option>
@@ -245,6 +240,18 @@ export default function CitasAdminPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Paginación */}
+      {!loading && todasLasCitas.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          totalItems={todasLasCitas.length}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
       )}
     </div>
   )

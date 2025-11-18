@@ -56,16 +56,73 @@ export default function ReservaCita({ selectedPatient, onAppointmentCreated }: A
     if (!doctorId || !date) return
 
     setVerificando(true)
-    const { data } = await supabase
+
+    // 1. Verificar si el doctor tiene configuración de disponibilidad
+    const { data: configuracionGeneral } = await supabase
+      .from('doctor_availability')
+      .select('id, day_of_week, is_available')
+      .eq('doctor_id', doctorId)
+
+    // Si tiene configuración vacía (day_of_week = 0, is_available = false), no hay horarios disponibles
+    const tieneConfiguracionVacia = configuracionGeneral?.some(
+      item => item.day_of_week === 0 && item.is_available === false
+    )
+
+    if (tieneConfiguracionVacia) {
+      setHorariosDisponibles([])
+      setVerificando(false)
+      return
+    }
+
+    // 2. Obtener el día de la semana
+    const fechaObj = new Date(date + 'T00:00:00')
+    const diaSemanaJS = fechaObj.getDay() // 0=Domingo, 1=Lunes, ..., 6=Sábado
+
+    let horariosConfigurados: string[] = []
+
+    // Si el doctor tiene configuración, consultar horarios disponibles para ese día
+    const tieneConfig = (configuracionGeneral && configuracionGeneral.length > 0)
+    
+    if (tieneConfig && diaSemanaJS !== 0) {
+      // Consultar disponibilidad del doctor para ese día específico
+      const { data: disponibilidadData } = await supabase
+        .from('doctor_availability')
+        .select('time_slot')
+        .eq('doctor_id', doctorId)
+        .eq('day_of_week', diaSemanaJS)
+        .eq('is_available', true)
+
+      if (disponibilidadData) {
+        // Extraer solo HH:MM de los time_slot
+        horariosConfigurados = disponibilidadData.map(item => item.time_slot.substring(0, 5))
+      }
+    }
+
+    // 3. Obtener citas ocupadas
+    const { data: citasData } = await supabase
       .from('appointments')
       .select('appointment_time')
       .eq('doctor_id', doctorId)
       .eq('appointment_date', date)
       .in('status', ['pending', 'confirmed'])
 
-    const bookedTimes = data?.map(apt => apt.appointment_time) || []
-    const available = timeSlots.filter(slot => !bookedTimes.includes(slot + ':00'))
-    setHorariosDisponibles(available)
+    const bookedTimes = citasData?.map(apt => apt.appointment_time.substring(0, 5)) || []
+
+    // 4. Filtrar horarios: deben estar configurados como disponibles Y no estar ocupados
+    let horariosFinales: string[]
+
+    if (tieneConfig && horariosConfigurados.length > 0) {
+      // Si tiene configuración, solo mostrar los horarios configurados que no están ocupados
+      horariosFinales = horariosConfigurados.filter(slot => !bookedTimes.includes(slot))
+    } else if (tieneConfig && horariosConfigurados.length === 0) {
+      // Si tiene configuración pero no hay horarios para ese día, no mostrar nada
+      horariosFinales = []
+    } else {
+      // Si no tiene configuración, mostrar todos los horarios que no están ocupados (comportamiento por defecto)
+      horariosFinales = timeSlots.filter(slot => !bookedTimes.includes(slot))
+    }
+
+    setHorariosDisponibles(horariosFinales)
     setVerificando(false)
   }
 
@@ -79,6 +136,12 @@ export default function ReservaCita({ selectedPatient, onAppointmentCreated }: A
 
     if (!form.doctor_id || !form.appointment_date || !form.appointment_time || !form.consultation_type) {
       alert('Complete todos los campos obligatorios')
+      return
+    }
+
+    // Validar que el horario seleccionado esté en la lista de horarios disponibles
+    if (!horariosDisponibles.includes(form.appointment_time)) {
+      alert('El horario seleccionado no está disponible. Por favor, seleccione otro horario.')
       return
     }
 

@@ -10,11 +10,16 @@ interface Estadisticas {
   citasCompletadas: number
   citasPendientes: number
   citasCanceladas: number
+  citasConfirmadas: number
   totalPacientes: number
   totalDoctores: number
   citasPorDoctor: { name: string; count: number; specialty: string }[]
   citasPorEstado: { status: string; count: number }[]
   citasPorEspecialidad: { specialty: string; count: number }[]
+  citasPorDiaSemana: { dia: string; count: number }[]
+  citasPorHora: { hora: string; count: number }[]
+  promedioCitasPorDoctor: number
+  tasaOcupacion: number
 }
 
 export default function ReportesAdminPage() {
@@ -23,11 +28,16 @@ export default function ReportesAdminPage() {
     citasCompletadas: 0,
     citasPendientes: 0,
     citasCanceladas: 0,
+    citasConfirmadas: 0,
     totalPacientes: 0,
     totalDoctores: 0,
     citasPorDoctor: [],
     citasPorEstado: [],
-    citasPorEspecialidad: []
+    citasPorEspecialidad: [],
+    citasPorDiaSemana: [],
+    citasPorHora: [],
+    promedioCitasPorDoctor: 0,
+    tasaOcupacion: 0
   })
   const [loading, setLoading] = useState(true)
   const [filterMode, setFilterMode] = useState<'day' | 'range'>('day')
@@ -81,6 +91,7 @@ export default function ReportesAdminPage() {
     const completadas = citas?.filter(c => c.status === 'completed').length || 0
     const pendientes = citas?.filter(c => c.status === 'pending').length || 0
     const canceladas = citas?.filter(c => c.status === 'cancelled').length || 0
+    const confirmadas = citas?.filter(c => c.status === 'confirmed').length || 0
 
     const citasPorDoctor = citas?.reduce((acc: any[], cita: any) => {
       const doctorName = cita.doctor?.name || 'Sin doctor'
@@ -110,8 +121,47 @@ export default function ReportesAdminPage() {
 
     citasPorEspecialidad.sort((a, b) => b.count - a.count)
 
+    // Citas por día de la semana
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    const citasPorDiaSemana = citas?.reduce((acc: any[], cita: any) => {
+      const fecha = new Date(cita.appointment_date)
+      const diaSemana = diasSemana[fecha.getDay()]
+      const existing = acc.find(d => d.dia === diaSemana)
+      if (existing) {
+        existing.count++
+      } else {
+        acc.push({ dia: diaSemana, count: 1 })
+      }
+      return acc
+    }, []) || []
+
+    // Ordenar por día de la semana
+    const ordenDias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    citasPorDiaSemana.sort((a, b) => ordenDias.indexOf(a.dia) - ordenDias.indexOf(b.dia))
+
+    // Citas por hora del día
+    const citasPorHora = citas?.reduce((acc: any[], cita: any) => {
+      const hora = cita.appointment_time.substring(0, 5) // HH:MM
+      const horaRedondeada = `${hora.substring(0, 2)}:00` // Redondear a la hora
+      const existing = acc.find(h => h.hora === horaRedondeada)
+      if (existing) {
+        existing.count++
+      } else {
+        acc.push({ hora: horaRedondeada, count: 1 })
+      }
+      return acc
+    }, []) || []
+
+    citasPorHora.sort((a, b) => a.hora.localeCompare(b.hora))
+
+    // Calcular KPIs
+    const promedioCitasPorDoctor = doctores?.length > 0 ? (totalCitas / doctores.length) : 0
+    const citasProgramadas = completadas + confirmadas + pendientes
+    const tasaOcupacion = totalCitas > 0 ? ((citasProgramadas / totalCitas) * 100) : 0
+
     const citasPorEstado = [
       { status: 'Completadas', count: completadas },
+      { status: 'Confirmadas', count: confirmadas },
       { status: 'Pendientes', count: pendientes },
       { status: 'Canceladas', count: canceladas }
     ]
@@ -121,11 +171,16 @@ export default function ReportesAdminPage() {
       citasCompletadas: completadas,
       citasPendientes: pendientes,
       citasCanceladas: canceladas,
+      citasConfirmadas: confirmadas,
       totalPacientes: pacientes?.length || 0,
       totalDoctores: doctores?.length || 0,
       citasPorDoctor,
       citasPorEstado,
-      citasPorEspecialidad
+      citasPorEspecialidad,
+      citasPorDiaSemana,
+      citasPorHora,
+      promedioCitasPorDoctor: Math.round(promedioCitasPorDoctor * 10) / 10,
+      tasaOcupacion: Math.round(tasaOcupacion * 10) / 10
     })
 
     setLoading(false)
@@ -262,63 +317,69 @@ export default function ReportesAdminPage() {
         </div>
       </div>
 
-      {/* KPI Cards - Resumen General */}
+      {/* KPI Cards - KPIs Principales */}
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-3">📊 Resumen General</h2>
+        <h2 className="text-lg font-bold text-gray-800 mb-3">Indicadores Clave de Rendimiento (KPIs)</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-700 mb-1">Total Citas</p>
-                <p className="text-3xl font-bold text-blue-900">{stats.totalCitas}</p>
-                <p className="text-xs text-blue-600 mt-1">En el período seleccionado</p>
+                <p className="text-sm font-medium text-blue-700 mb-1">Tasa de Ocupación</p>
+                <p className="text-3xl font-bold text-blue-900">{stats.tasaOcupacion}%</p>
+                <p className="text-xs text-blue-600 mt-1">Citas programadas vs total</p>
               </div>
-              <Calendar className="w-12 h-12 text-blue-400" />
+              <Activity className="w-12 h-12 text-blue-400" />
             </div>
           </div>
 
           <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-700 mb-1">Completadas</p>
-                <p className="text-3xl font-bold text-green-900">{stats.citasCompletadas}</p>
+                <p className="text-sm font-medium text-green-700 mb-1">Tasa de Completadas</p>
+                <p className="text-3xl font-bold text-green-900">
+                  {stats.totalCitas > 0 ? Math.round((stats.citasCompletadas / stats.totalCitas) * 100) : 0}%
+                </p>
                 <p className="text-xs text-green-600 mt-1">
-                  {stats.totalCitas > 0 ? Math.round((stats.citasCompletadas / stats.totalCitas) * 100) : 0}% del total
+                  {stats.citasCompletadas} de {stats.totalCitas} citas
                 </p>
               </div>
-              <Activity className="w-12 h-12 text-green-400" />
+              <Calendar className="w-12 h-12 text-green-400" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-700 mb-1">Tasa de Cancelación</p>
+                <p className="text-3xl font-bold text-red-900">
+                  {stats.totalCitas > 0 ? Math.round((stats.citasCanceladas / stats.totalCitas) * 100) : 0}%
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  {stats.citasCanceladas} canceladas
+                </p>
+              </div>
+              <TrendingUp className="w-12 h-12 text-red-400 rotate-180" />
             </div>
           </div>
 
           <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-700 mb-1">Pacientes</p>
-                <p className="text-3xl font-bold text-purple-900">{stats.totalPacientes}</p>
-                <p className="text-xs text-purple-600 mt-1">Registrados en el sistema</p>
+                <p className="text-sm font-medium text-purple-700 mb-1">Promedio por Doctor</p>
+                <p className="text-3xl font-bold text-purple-900">{stats.promedioCitasPorDoctor}</p>
+                <p className="text-xs text-purple-600 mt-1">Citas por médico</p>
               </div>
               <Users className="w-12 h-12 text-purple-400" />
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-700 mb-1">Doctores</p>
-                <p className="text-3xl font-bold text-orange-900">{stats.totalDoctores}</p>
-                <p className="text-xs text-orange-600 mt-1">Equipo médico activo</p>
-              </div>
-              <TrendingUp className="w-12 h-12 text-orange-400" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Gráfico de barras horizontales - Actividad por Médico */}
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-          <h3 className="font-bold text-lg mb-4 text-gray-800">📊 Actividad por Médico</h3>
-          <p className="text-xs text-gray-500 mb-4">Comparación de citas atendidas</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+          <h3 className="font-bold text-lg mb-4 text-gray-800">Productividad por Médico</h3>
+          <p className="text-xs text-gray-500 mb-4">Citas atendidas por profesional</p>
           <div className="space-y-4">
             {stats.citasPorDoctor.slice(0, 8).map((doctor, index) => {
               const porcentaje = (doctor.count / maxCitas) * 100
@@ -363,7 +424,7 @@ export default function ReportesAdminPage() {
 
         {/* Gráfico de dona - Citas por Especialidad */}
         <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-          <h3 className="font-bold text-lg mb-4 text-gray-800">🍩 Citas por Especialidad</h3>
+          <h3 className="font-bold text-lg mb-4 text-gray-800">Distribución por Especialidad</h3>
           <p className="text-xs text-gray-500 mb-4">Distribución porcentual</p>
           
           {stats.citasPorEspecialidad.length > 0 ? (
@@ -431,27 +492,98 @@ export default function ReportesAdminPage() {
         </div>
       </div>
 
-      {/* Resumen de porcentajes */}
+      {/* Gráficos adicionales de KPIs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Citas por Día de la Semana */}
+        <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+          <h3 className="font-bold text-lg mb-4 text-gray-800">Citas por Día de la Semana</h3>
+          <p className="text-xs text-gray-500 mb-4">Distribución semanal de demanda</p>
+          <div className="space-y-3">
+            {stats.citasPorDiaSemana.map((dia, index) => {
+              const maxDia = Math.max(...stats.citasPorDiaSemana.map(d => d.count), 1)
+              const porcentaje = (dia.count / maxDia) * 100
+              return (
+                <div key={index}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-semibold text-gray-800">{dia.dia}</span>
+                    <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
+                      {dia.count} citas
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-6 flex items-center justify-end pr-2 transition-all duration-500"
+                      style={{ width: `${porcentaje}%` }}
+                    >
+                      {porcentaje > 20 && (
+                        <span className="text-xs text-white font-bold">
+                          {Math.round(porcentaje)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Citas por Hora del Día */}
+        <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+          <h3 className="font-bold text-lg mb-4 text-gray-800">Horarios de Mayor Demanda</h3>
+          <p className="text-xs text-gray-500 mb-4">Distribución horaria de citas</p>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {stats.citasPorHora.slice(0, 12).map((hora, index) => {
+              const maxHora = Math.max(...stats.citasPorHora.map(h => h.count), 1)
+              const porcentaje = (hora.count / maxHora) * 100
+              return (
+                <div key={index} className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-gray-700 w-16">{hora.hora}</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-teal-500 to-teal-600 h-5 transition-all duration-500"
+                      style={{ width: `${porcentaje}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-gray-800 w-12 text-right">{hora.count}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Resumen de Estados */}
       <div className="bg-white border border-gray-200 rounded p-4 mt-6">
-        <h3 className="font-bold text-lg mb-3">Resumen de Eficiencia</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <h3 className="font-bold text-lg mb-3">Resumen de Estados</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div>
-            <p className="text-3xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-green-600">{stats.citasCompletadas}</p>
+            <p className="text-sm text-gray-600">Completadas</p>
+            <p className="text-xs text-gray-500">
               {stats.totalCitas > 0 ? Math.round((stats.citasCompletadas / stats.totalCitas) * 100) : 0}%
             </p>
-            <p className="text-sm text-gray-600">Tasa de Completadas</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-yellow-600">
+            <p className="text-2xl font-bold text-blue-600">{stats.citasConfirmadas}</p>
+            <p className="text-sm text-gray-600">Confirmadas</p>
+            <p className="text-xs text-gray-500">
+              {stats.totalCitas > 0 ? Math.round((stats.citasConfirmadas / stats.totalCitas) * 100) : 0}%
+            </p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-yellow-600">{stats.citasPendientes}</p>
+            <p className="text-sm text-gray-600">Pendientes</p>
+            <p className="text-xs text-gray-500">
               {stats.totalCitas > 0 ? Math.round((stats.citasPendientes / stats.totalCitas) * 100) : 0}%
             </p>
-            <p className="text-sm text-gray-600">Tasa de Pendientes</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-red-600">
+            <p className="text-2xl font-bold text-red-600">{stats.citasCanceladas}</p>
+            <p className="text-sm text-gray-600">Canceladas</p>
+            <p className="text-xs text-gray-500">
               {stats.totalCitas > 0 ? Math.round((stats.citasCanceladas / stats.totalCitas) * 100) : 0}%
             </p>
-            <p className="text-sm text-gray-600">Tasa de Canceladas</p>
           </div>
         </div>
       </div>

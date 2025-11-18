@@ -58,7 +58,7 @@ export default function RecepcionistaPage() {
 
       {completed.includes(2) && (
         <div className="bg-green-100 border-2 border-green-400 rounded p-3 text-center mb-5">
-          <p className="text-green-700 font-medium">✓ Cita agendada exitosamente</p>
+          <p className="text-green-700 font-medium">Cita agendada exitosamente</p>
           <p className="text-green-600 text-sm mt-1">Puedes ver todas las citas en "Citas del Día" del menú</p>
         </div>
       )}

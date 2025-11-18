@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeAppointments } from '@/lib/hooks/useRealtimeAppointments'
 import DateSelector from './DateSelector'
 import { ArrowUp, ArrowDown } from 'lucide-react'
 
@@ -30,22 +31,74 @@ const HORARIOS = [
 ]
 
 export default function CitasConDragDrop() {
-  const [citas, setCitas] = useState<AppointmentWithDetails[]>([])
   const [doctores, setDoctores] = useState<Doctor[]>([])
   const [doctorSeleccionado, setDoctorSeleccionado] = useState<string>('')
-  const [loading, setLoading] = useState(false)
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [draggedCita, setDraggedCita] = useState<string | null>(null)
+  const [disponibilidad, setDisponibilidad] = useState<Map<string, boolean>>(new Map())
+  const [cargandoDisponibilidad, setCargandoDisponibilidad] = useState(false)
+  const [tieneConfiguracion, setTieneConfiguracion] = useState<boolean | null>(null) // null = no verificado, true/false = verificado
+
+  // Usar el hook de tiempo real para obtener citas
+  const { appointments, loading } = useRealtimeAppointments({
+    date: fecha,
+    doctorId: doctorSeleccionado,
+    enabled: !!doctorSeleccionado && !!fecha
+  })
+
+  // Convertir appointments a AppointmentWithDetails
+  const citas = appointments as AppointmentWithDetails[]
 
   useEffect(() => {
     cargarDoctores()
   }, [])
 
   useEffect(() => {
-    if (fecha) {
-      cargarCitas()
+    if (doctores.length > 0 && !doctorSeleccionado) {
+      setDoctorSeleccionado(doctores[0].id)
     }
-  }, [fecha, doctorSeleccionado])
+  }, [doctores, doctorSeleccionado])
+
+  // Cargar disponibilidad cuando cambia el doctor o la fecha
+  useEffect(() => {
+    if (doctorSeleccionado && fecha) {
+      cargarDisponibilidad()
+    }
+  }, [doctorSeleccionado, fecha])
+
+  // Suscripción en tiempo real para cambios en disponibilidad del doctor
+  useEffect(() => {
+    if (!doctorSeleccionado) return
+
+    const channel = supabase
+      .channel('doctor-availability-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuchar INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'doctor_availability',
+          filter: `doctor_id=eq.${doctorSeleccionado}`,
+        },
+        (payload) => {
+          console.log('Cambio detectado en disponibilidad del doctor:', payload.eventType)
+          // Recargar disponibilidad cuando hay cambios
+          if (doctorSeleccionado && fecha) {
+            cargarDisponibilidad()
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Suscripción a cambios de disponibilidad activada')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctorSeleccionado, fecha])
 
   const cargarDoctores = async () => {
     const { data } = await supabase
@@ -61,25 +114,89 @@ export default function CitasConDragDrop() {
     }
   }
 
-  const cargarCitas = async () => {
-    if (!doctorSeleccionado) return
-    
-    setLoading(true)
-    const { data } = await supabase
-      .from('appointments')
-      .select(`
-        *,
-        patient:patients(first_name, last_name, rut),
-        doctor:doctors(name, specialty, id)
-      `)
-      .eq('appointment_date', fecha)
-      .eq('doctor_id', doctorSeleccionado)
-      .order('appointment_time')
+  const cargarDisponibilidad = async () => {
+    if (!doctorSeleccionado || !fecha) return
 
-    if (data) {
-      setCitas(data as AppointmentWithDetails[])
+    setCargandoDisponibilidad(true)
+    
+    // Primero verificar si el doctor tiene alguna configuración de disponibilidad
+    // Buscar cualquier registro, incluyendo el marcador especial (day_of_week = 0)
+    const { data: configuracionGeneral } = await supabase
+      .from('doctor_availability')
+      .select('id, day_of_week, is_available')
+      .eq('doctor_id', doctorSeleccionado)
+
+    // Si hay un registro con day_of_week = 0 y is_available = false, significa que configuró pero está vacío
+    const tieneConfiguracionVacia = configuracionGeneral?.some(
+      item => item.day_of_week === 0 && item.is_available === false
+    )
+    
+    // Si tiene configuración vacía, no mostrar horarios
+    if (tieneConfiguracionVacia) {
+      setTieneConfiguracion(true)
+      setDisponibilidad(new Map())
+      setCargandoDisponibilidad(false)
+      return
     }
-    setLoading(false)
+
+    // Si tiene otros registros de disponibilidad, significa que sí configuró
+    const tieneConfig = (configuracionGeneral && configuracionGeneral.length > 0)
+    setTieneConfiguracion(tieneConfig)
+    
+    // Obtener el día de la semana (0=Domingo, 1=Lunes, ..., 6=Sábado)
+    const fechaObj = new Date(fecha + 'T00:00:00') // Agregar hora para evitar problemas de zona horaria
+    const diaSemanaJS = fechaObj.getDay() // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    
+    // Convertir a formato de base de datos: 1=Lunes, 2=Martes, ..., 6=Sábado
+    // En DisponibilidadDoctor se guarda: 1=Lunes, 2=Martes, ..., 6=Sábado (sin domingo)
+    // JavaScript getDay(): 0=Domingo, 1=Lunes, ..., 6=Sábado
+    // Base de datos: 1=Lunes, 2=Martes, ..., 6=Sábado
+    let diaSemanaDB: number
+    if (diaSemanaJS === 0) {
+      // Domingo - no hay disponibilidad configurada
+      setDisponibilidad(new Map())
+      setCargandoDisponibilidad(false)
+      return
+    } else {
+      // Lunes=1, Martes=2, ..., Sábado=6
+      diaSemanaDB = diaSemanaJS
+    }
+
+    // Consultar disponibilidad del doctor para ese día específico
+    const { data } = await supabase
+      .from('doctor_availability')
+      .select('*')
+      .eq('doctor_id', doctorSeleccionado)
+      .eq('day_of_week', diaSemanaDB)
+      .eq('is_available', true)
+
+    const mapa = new Map<string, boolean>()
+    if (data) {
+      data.forEach((item) => {
+        // El time_slot viene como "HH:MM:SS" o "HH:MM", extraer solo HH:MM
+        const hora = item.time_slot.substring(0, 5)
+        mapa.set(hora, true)
+      })
+    }
+
+    setDisponibilidad(mapa)
+    setCargandoDisponibilidad(false)
+  }
+
+  // Verificar si un horario está disponible según la configuración del doctor
+  const estaDisponible = (horario: string): boolean => {
+    // Si el doctor nunca configuró disponibilidad, mostrar todos los horarios (comportamiento por defecto)
+    if (tieneConfiguracion === false || tieneConfiguracion === null) {
+      return true
+    }
+    
+    // Si el doctor tiene configuración pero no hay horarios disponibles para este día, no mostrar nada
+    if (tieneConfiguracion === true && disponibilidad.size === 0) {
+      return false
+    }
+    
+    // Si hay horarios configurados, verificar si este horario específico está disponible
+    return disponibilidad.has(horario)
   }
 
   const cambiarEstado = async (citaId: string, nuevoEstado: string) => {
@@ -99,6 +216,12 @@ export default function CitasConDragDrop() {
   }
 
   const cambiarHorario = async (citaId: string, nuevoHorario: string) => {
+    // Verificar que el horario esté disponible según la configuración del doctor
+    if (!estaDisponible(nuevoHorario)) {
+      alert('Este horario no está disponible según la configuración del doctor')
+      return
+    }
+
     const citaExistente = citas.find(c => {
       const citaHora = c.appointment_time.substring(0, 5)
       return citaHora === nuevoHorario && c.id !== citaId
@@ -178,10 +301,12 @@ export default function CitasConDragDrop() {
     const indiceActual = HORARIOS.indexOf(horarioActual)
     if (indiceActual > 0) {
       const nuevoHorario = HORARIOS[indiceActual - 1]
-      // Verificar que el nuevo horario esté libre
+      // Verificar que el nuevo horario esté libre y disponible
       const citaEnNuevoHorario = getCitaPorHorario(nuevoHorario)
-      if (!citaEnNuevoHorario) {
+      if (!citaEnNuevoHorario && estaDisponible(nuevoHorario)) {
         cambiarHorario(citaId, nuevoHorario)
+      } else if (!estaDisponible(nuevoHorario)) {
+        alert('El horario anterior no está disponible según la configuración del doctor')
       } else {
         alert('El horario anterior ya está ocupado')
       }
@@ -192,10 +317,12 @@ export default function CitasConDragDrop() {
     const indiceActual = HORARIOS.indexOf(horarioActual)
     if (indiceActual < HORARIOS.length - 1) {
       const nuevoHorario = HORARIOS[indiceActual + 1]
-      // Verificar que el nuevo horario esté libre
+      // Verificar que el nuevo horario esté libre y disponible
       const citaEnNuevoHorario = getCitaPorHorario(nuevoHorario)
-      if (!citaEnNuevoHorario) {
+      if (!citaEnNuevoHorario && estaDisponible(nuevoHorario)) {
         cambiarHorario(citaId, nuevoHorario)
+      } else if (!estaDisponible(nuevoHorario)) {
+        alert('El horario siguiente no está disponible según la configuración del doctor')
       } else {
         alert('El horario siguiente ya está ocupado')
       }
@@ -235,10 +362,9 @@ export default function CitasConDragDrop() {
               <h3 className="font-bold text-gray-800">{doctorActual.name}</h3>
               <p className="text-sm text-gray-600">{doctorActual.specialty}</p>
               <p className="text-sm text-blue-700 mt-1">
-                📅 {citas.length} citas programadas
+                {citas.length} citas programadas
               </p>
             </div>
-            <div className="text-4xl">👨‍⚕️</div>
           </div>
         </div>
       )}
@@ -253,22 +379,38 @@ export default function CitasConDragDrop() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {HORARIOS.map((horario) => {
             const cita = getCitaPorHorario(horario)
+            const disponible = estaDisponible(horario)
+            
+            // Si no está disponible según la configuración del doctor, no mostrar el horario
+            if (!disponible && !cita) {
+              return null
+            }
             
             return (
               <div
                 key={horario}
                 className={`border-2 border-dashed rounded p-2 min-h-[100px] transition-all duration-200 ${
-                  draggedCita && !cita 
+                  !disponible && !cita
+                    ? 'border-gray-200 bg-gray-100 opacity-50'
+                    : draggedCita && !cita 
                     ? 'border-blue-500 bg-blue-50 scale-[1.02]' 
                     : 'border-gray-300 bg-white'
                 }`}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, horario)}
+                onDragOver={disponible ? handleDragOver : undefined}
+                onDrop={disponible ? (e) => handleDrop(e, horario) : undefined}
               >
                 <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-gray-800 text-sm">{horario}</span>
-                  {!cita && (
-                    <span className="text-xs text-gray-400">Libre</span>
+                  <span className={`font-bold text-sm ${!disponible ? 'text-gray-400' : 'text-gray-800'}`}>
+                    {horario}
+                  </span>
+                  {!cita && disponible && (
+                    <span className="text-xs text-green-600 font-medium">Disponible</span>
+                  )}
+                  {!cita && !disponible && (
+                    <span className="text-xs text-red-500 font-medium">No disponible</span>
+                  )}
+                  {cita && (
+                    <span className="text-xs text-blue-600 font-medium">Ocupado</span>
                   )}
                 </div>
 
@@ -283,7 +425,6 @@ export default function CitasConDragDrop() {
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1">
-                          <span className="text-xs font-bold">🔄</span>
                           <span className={`text-xs px-1.5 py-0.5 rounded ${getEstadoColor(cita.status)}`}>
                             {getEstadoTexto(cita.status)}
                           </span>

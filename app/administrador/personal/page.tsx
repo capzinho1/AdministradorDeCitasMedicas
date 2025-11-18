@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Doctor, Receptionist, Administrator } from '@/lib/supabase'
-import { UserPlus, Trash2, User, ChevronLeft, ChevronRight } from 'lucide-react'
+import { UserPlus, Trash2, User, Eye, EyeOff } from 'lucide-react'
+import Pagination from '@/components/shared/Pagination'
 
 type PersonalType = 'doctor' | 'receptionist' | 'administrator'
 
@@ -14,7 +15,7 @@ export default function PersonalPage() {
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState<'all' | PersonalType>('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
+  const [itemsPerPage, setItemsPerPage] = useState(16)
   
   const [showForm, setShowForm] = useState(false)
   const [formType, setFormType] = useState<PersonalType>('doctor')
@@ -23,9 +24,43 @@ export default function PersonalPage() {
     name: '',
     email: '',
     phone: '',
-    password: 'doctor123',
+    password: '',
     specialty: ''
   })
+
+  const [passwordError, setPasswordError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+
+  const specialties = [
+    'Medicina General',
+    'Pediatría',
+    'Ginecología',
+    'Cardiología',
+    'Traumatología',
+    'Dermatología',
+    'Oftalmología',
+    'Otorrinolaringología',
+    'Psiquiatría',
+    'Urología'
+  ]
+
+  // Validar contraseña segura
+  const validatePassword = (password: string): string => {
+    if (password.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres'
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'La contraseña debe contener al menos una letra mayúscula'
+    }
+
+    if (!/[0-9]/.test(password)) {
+      return 'La contraseña debe contener al menos un número'
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return 'La contraseña debe contener al menos un carácter especial'
+    }
+    return ''
+  }
 
   useEffect(() => {
     cargarPersonal()
@@ -33,7 +68,7 @@ export default function PersonalPage() {
 
   useEffect(() => {
     setCurrentPage(1) // Resetear a página 1 cuando cambia el filtro
-  }, [filtroTipo])
+  }, [filtroTipo, itemsPerPage])
 
   const cargarPersonal = async () => {
     setLoading(true)
@@ -66,14 +101,34 @@ export default function PersonalPage() {
       name: '',
       email: '',
       phone: '',
-      password: type === 'doctor' ? 'doctor123' : type === 'receptionist' ? 'recepcion123' : 'admin123',
+      password: '',
       specialty: ''
     })
+    setPasswordError('')
+    setShowPassword(false)
     setShowForm(true)
   }
 
   const guardarPersonal = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validar contraseña
+    const passwordValidation = validatePassword(formData.password)
+    if (passwordValidation) {
+      setPasswordError(passwordValidation)
+      return
+    }
+
+    // Validar que todos los campos estén completos
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.password.trim()) {
+      alert('Por favor complete todos los campos obligatorios')
+      return
+    }
+
+    if (formType === 'doctor' && !formData.specialty.trim()) {
+      alert('Por favor seleccione una especialidad')
+      return
+    }
     
     try {
       if (formType === 'doctor') {
@@ -102,8 +157,10 @@ export default function PersonalPage() {
       
       setShowForm(false)
       cargarPersonal()
+      alert('Personal agregado exitosamente')
     } catch (error) {
       console.error('Error al guardar:', error)
+      alert('Error al guardar el personal. Por favor intente nuevamente.')
     }
   }
 
@@ -127,7 +184,7 @@ export default function PersonalPage() {
 
   // Función para obtener todos los elementos según el filtro
   const getFilteredItems = () => {
-    const allItems: Array<{id: string, name: string, email: string, phone?: string, specialty?: string, type: PersonalType}> = []
+    const allItems: Array<{id: string, name: string, email?: string, phone?: string, specialty?: string, type: PersonalType}> = []
     
     if (filtroTipo === 'all' || filtroTipo === 'doctor') {
       doctors.forEach(d => allItems.push({...d, type: 'doctor'}))
@@ -217,7 +274,7 @@ export default function PersonalPage() {
             
             <form onSubmit={guardarPersonal} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre Completo</label>
+                <label className="block text-sm font-medium mb-1">Nombre Completo *</label>
                 <input
                   type="text"
                   value={formData.name}
@@ -229,19 +286,25 @@ export default function PersonalPage() {
 
               {formType === 'doctor' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Especialidad</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium mb-1">Especialidad *</label>
+                  <select
                     value={formData.specialty}
                     onChange={(e) => setFormData({...formData, specialty: e.target.value})}
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     required
-                  />
+                  >
+                    <option value="">Seleccionar especialidad</option>
+                    {specialties.map((specialty) => (
+                      <option key={specialty} value={specialty}>
+                        {specialty}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <label className="block text-sm font-medium mb-1">Email *</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -252,25 +315,56 @@ export default function PersonalPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Teléfono</label>
+                <label className="block text-sm font-medium mb-1">Teléfono *</label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   placeholder="+56912345678"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Contraseña</label>
-                <input
-                  type="text"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  required
-                />
+                <label className="block text-sm font-medium mb-1">Contraseña *</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({...formData, password: e.target.value})
+                      const error = validatePassword(e.target.value)
+                      setPasswordError(error)
+                    }}
+                    className={`w-full border rounded px-3 py-2 pr-10 ${
+                      passwordError ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-2.5 text-gray-500 hover:text-gray-700"
+                    title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                {passwordError && (
+                  <p className="text-xs text-red-600 mt-1">{passwordError}</p>
+                )}
+                {!passwordError && formData.password && (
+                  <p className="text-xs text-green-600 mt-1">Contraseña válida</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Requisitos: Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 carácter especial
+                </p>
               </div>
 
               <div className="flex gap-2 pt-3">
@@ -336,7 +430,7 @@ export default function PersonalPage() {
                         )}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
-                        <span className="truncate">{item.email}</span>
+                        {item.email && <span className="truncate">{item.email}</span>}
                         {item.phone && <span className="whitespace-nowrap">{item.phone}</span>}
                       </div>
                     </div>
@@ -357,63 +451,16 @@ export default function PersonalPage() {
           )}
         </div>
 
-        {/* Controles de Paginación */}
-        {totalPages > 1 && (
-          <div className="mt-3 flex items-center justify-center gap-1">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            
-            <div className="flex gap-0.5">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-                // Mostrar solo algunas páginas alrededor de la actual
-                if (
-                  page === 1 ||
-                  page === totalPages ||
-                  (page >= currentPage - 2 && page <= currentPage + 2)
-                ) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-2 py-0.5 text-xs border rounded ${
-                        currentPage === page
-                          ? 'bg-purple-600 text-white border-purple-600'
-                          : 'border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                } else if (
-                  page === currentPage - 3 ||
-                  page === currentPage + 3
-                ) {
-                  return <span key={page} className="px-1 text-xs">...</span>
-                }
-                return null
-              })}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Info de paginación */}
+        {/* Paginación */}
         {totalItems > 0 && (
-          <div className="mt-1 text-center text-xs text-gray-500">
-            {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} de {totalItems}
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            itemsPerPage={itemsPerPage}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         )}
       </div>
     </div>

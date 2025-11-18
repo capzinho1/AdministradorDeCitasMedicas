@@ -32,14 +32,17 @@ npm install
 
 ### 2. Configurar Variables de Entorno
 
-Crear un archivo `.env.local` en la raíz del proyecto:
+Crear un archivo `.env.local` en la raíz del proyecto (puedes copiar `.env.example`):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
 ```
 
-**⚠️ Importante:** Las keys de Supabase son sensibles. Obtén tus propias keys desde tu proyecto en [Supabase](https://supabase.com).
+**⚠️ Importante:** 
+- Las keys de Supabase son sensibles. Obtén tus propias keys desde tu proyecto en [Supabase](https://supabase.com).
+- **NUNCA subas el archivo `.env.local` a GitHub** - ya está protegido en `.gitignore`
+- Para desplegar en Vercel, configura las variables de entorno en el dashboard de Vercel (ver `DEPLOY.md`)
 
 ### 3. Configurar Base de Datos
 

@@ -29,7 +29,8 @@ export async function login(email: string, password: string): Promise<{ user: Au
       phone: doctor.phone
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem('currentUser', JSON.stringify(user))
+      // Usar sessionStorage en lugar de localStorage para sesiones independientes por pestaña/navegador
+      sessionStorage.setItem('currentUser', JSON.stringify(user))
     }
     return { user, role: 'doctor' }
   }
@@ -51,7 +52,8 @@ export async function login(email: string, password: string): Promise<{ user: Au
       phone: receptionist.phone
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem('currentUser', JSON.stringify(user))
+      // Usar sessionStorage en lugar de localStorage para sesiones independientes por pestaña/navegador
+      sessionStorage.setItem('currentUser', JSON.stringify(user))
     }
     return { user, role: 'receptionist' }
   }
@@ -73,7 +75,8 @@ export async function login(email: string, password: string): Promise<{ user: Au
       phone: admin.phone
     }
     if (typeof window !== 'undefined') {
-      localStorage.setItem('currentUser', JSON.stringify(user))
+      // Usar sessionStorage en lugar de localStorage para sesiones independientes por pestaña/navegador
+      sessionStorage.setItem('currentUser', JSON.stringify(user))
     }
     return { user, role: 'administrator' }
   }
@@ -84,7 +87,8 @@ export async function login(email: string, password: string): Promise<{ user: Au
 export function getCurrentUser(): AuthUser | null {
   if (typeof window === 'undefined') return null
   
-  const userData = localStorage.getItem('currentUser')
+  // Usar sessionStorage en lugar de localStorage para sesiones independientes
+  const userData = sessionStorage.getItem('currentUser')
   if (!userData) return null
   
   return JSON.parse(userData)
@@ -98,8 +102,12 @@ export function getCurrentDoctor(): Doctor | null {
 
 export function signOut() {
   if (typeof window !== 'undefined') {
+    // Usar sessionStorage en lugar de localStorage
+    sessionStorage.removeItem('currentUser')
+    sessionStorage.removeItem('currentDoctor') // Por compatibilidad
+    // También limpiar localStorage por si acaso hay datos antiguos
     localStorage.removeItem('currentUser')
-    localStorage.removeItem('currentDoctor') // Por compatibilidad
+    localStorage.removeItem('currentDoctor')
   }
 }
 
